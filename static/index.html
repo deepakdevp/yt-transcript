@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Transcript</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#161920; --panel-2:#1c2029; --line:#272c37;
+  --ink:#e6e8ee; --ink-dim:#9aa3b2; --ink-faint:#6b7382;
+  --accent:#ff4d4d; --accent-soft:#ff4d4d1a; --ok:#3ecf8e; --warn:#f0b429;
+  --radius:10px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#f7f8fa;--panel:#fff;--panel-2:#f1f3f7;--line:#e2e6ed;
+        --ink:#151820;--ink-dim:#5b6472;--ink-faint:#8a93a3;--accent-soft:#ff4d4d14;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);
+     -webkit-font-smoothing:antialiased;padding:0 16px 64px}
+.wrap{max-width:900px;margin:0 auto}
+header{display:flex;align-items:center;gap:10px;padding:26px 0 18px}
+.logo{width:26px;height:19px;background:var(--accent);border-radius:6px;position:relative;flex:none}
+.logo::after{content:"";position:absolute;inset:0;margin:auto;width:0;height:0;
+  border-left:7px solid #fff;border-top:4.5px solid transparent;border-bottom:4.5px solid transparent}
+h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em}
+h1 span{color:var(--ink-faint);font-weight:400}
+
+/* ---- input row ---- */
+form{display:flex;gap:8px;flex-wrap:wrap}
+input[type=url],input[type=text]{flex:1 1 320px;min-width:0;padding:11px 13px;background:var(--panel);
+  color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);font:14px var(--sans);outline:none}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input::placeholder{color:var(--ink-faint)}
+button{padding:11px 16px;border-radius:var(--radius);border:1px solid var(--line);
+  background:var(--panel-2);color:var(--ink);font:500 14px var(--sans);cursor:pointer;
+  transition:background .12s,border-color .12s,transform .06s}
+button:hover:not(:disabled){border-color:var(--ink-faint)}
+button:active:not(:disabled){transform:translateY(1px)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover:not(:disabled){filter:brightness(1.08)}
+select{padding:9px 11px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:var(--radius);font:13px var(--sans);cursor:pointer;outline:none;max-width:210px}
+
+/* ---- states ---- */
+.msg{margin-top:16px;padding:13px 15px;border-radius:var(--radius);border:1px solid var(--line);
+  background:var(--panel);font-size:14px}
+.msg.err{border-color:#ff4d4d55;background:var(--accent-soft)}
+.msg .hint{color:var(--ink-dim);font-size:13px;margin-top:5px}
+.spinner{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;
+  border-radius:50%;display:inline-block;vertical-align:-2px;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- result ---- */
+.result{margin-top:22px;display:none}
+.result.on{display:block}
+.meta{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.thumb{width:104px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none;background:var(--panel-2)}
+.facts{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--ink-dim);white-space:nowrap}
+.pill.good{color:var(--ok);border-color:#3ecf8e44}
+.pill.warn{color:var(--warn);border-color:#f0b42944}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:0}
+.tab{padding:9px 15px;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--ink-faint);border-radius:0;font-weight:500}
+.tab:hover{color:var(--ink-dim);border-color:transparent}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:13px 0}
+.toolbar input[type=text]{flex:1 1 180px;padding:8px 11px;font-size:13px}
+.spacer{flex:1}
+
+.pane{display:none}
+.pane.on{display:block}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  max-height:min(60vh,620px);overflow:auto;padding:6px}
+.cue{display:flex;gap:11px;padding:4px 9px;border-radius:6px;font-size:14px;line-height:1.5}
+.cue:hover{background:var(--panel-2)}
+.cue.hide{display:none}
+.cue a{color:var(--ink-faint);font:12.5px/1.75 var(--mono);text-decoration:none;flex:none;
+  padding-top:1px;font-variant-numeric:tabular-nums}
+.cue a:hover{color:var(--accent);text-decoration:underline}
+.cue mark{background:var(--warn);color:#151820;border-radius:2px;padding:0 1px}
+.empty{padding:26px;text-align:center;color:var(--ink-faint);font-size:13.5px}
+
+/* ---- summary markdown ---- */
+.md{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:20px 22px;max-height:min(68vh,760px);overflow:auto;font-size:14.5px}
+.md>:first-child{margin-top:0}.md>:last-child{margin-bottom:0}
+.md h2{font-size:17px;margin:22px 0 9px;letter-spacing:-.01em}
+.md h3{font-size:15px;margin:19px 0 7px;color:var(--ink)}
+.md h3 code,.md h2 code{background:none;padding:0;color:var(--accent);font-family:var(--mono);font-size:.9em}
+.md p{margin:9px 0}
+.md ul,.md ol{margin:9px 0;padding-left:22px}
+.md li{margin:5px 0}
+.md code{background:var(--panel-2);padding:1.5px 5px;border-radius:4px;font:12.5px var(--mono)}
+.md pre{background:var(--panel-2);padding:12px;border-radius:8px;overflow:auto}
+.md pre code{background:none;padding:0}
+.md strong{font-weight:650}
+.md hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+.md blockquote{margin:9px 0;padding-left:13px;border-left:3px solid var(--line);color:var(--ink-dim)}
+.md a{color:var(--accent)}
+.md .ts{color:var(--accent);font-family:var(--mono);font-size:.88em;text-decoration:none}
+.md .ts:hover{text-decoration:underline}
+
+kbd{font:11px var(--mono);background:var(--panel-2);border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--ink-dim)}
+footer{margin-top:26px;color:var(--ink-faint);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo"></div>
+  <h1>YouTube Transcript <span>&amp; Summarizer</span></h1>
+</header>
+
+<form id="f" autocomplete="off">
+  <input type="url" id="url" placeholder="Paste a YouTube link — youtu.be/… , /watch?v=… , /shorts/…" required>
+  <button class="primary" id="go" type="submit">Get transcript</button>
+</form>
+
+<div id="msg"></div>
+
+<section class="result" id="result">
+  <div class="meta">
+    <img class="thumb" id="thumb" alt="" hidden>
+    <div class="facts" id="facts"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-pane="transcript" type="button">Transcript</button>
+    <button class="tab" data-pane="summary" type="button">Summary</button>
+  </div>
+
+  <!-- transcript pane -->
+  <div class="pane on" id="pane-transcript">
+    <div class="toolbar">
+      <input type="text" id="find" placeholder="Filter lines…  ( / )">
+      <select id="lang" hidden></select>
+      <span class="spacer"></span>
+      <button type="button" id="copyTs">Copy</button>
+      <button type="button" id="copyPlain">Copy plain</button>
+      <button type="button" id="dl">Download .txt</button>
+    </div>
+    <div class="box" id="cues"></div>
+  </div>
+
+  <!-- summary pane -->
+  <div class="pane" id="pane-summary">
+    <div class="toolbar">
+      <select id="style">
+        <option value="detailed">Detailed — topics + timestamps</option>
+        <option value="quick">Quick — TL;DR + bullets</option>
+        <option value="keypoints">Key points — flat list</option>
+      </select>
+      <button class="primary" type="button" id="sum">Summarize</button>
+      <span class="spacer"></span>
+      <button type="button" id="copySum" disabled>Copy summary</button>
+    </div>
+    <div id="sumOut"></div>
+  </div>
+</section>
+
+<footer>Runs locally · transcripts cached in <code>~/.cache/yt-transcript</code> · <kbd>⌘</kbd><kbd>↵</kbd> to fetch</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const n = document.createElement(t); if (c) n.className = c; return n; };
+let DATA = null, SUMMARY = "";
+
+/* ---------- tiny markdown renderer (no network) ---------- */
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function inline(s, vid){
+  s = esc(s);
+  s = s.replace(/`([^`]+)`/g, (_,c)=>'<code>'+c+'</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // turn bare [mm:ss] / [h:mm:ss] into links back into the video
+  if (vid) s = s.replace(/\[(\d{1,2}:)?(\d{1,2}):(\d{2})\]/g, (m,h,mm,ss)=>{
+    const t = (parseInt(h||0)*3600) + parseInt(mm)*60 + parseInt(ss);
+    return '<a class="ts" href="https://www.youtube.com/watch?v='+vid+'&t='+t+'s" target="_blank" rel="noopener">'+m+'</a>';
+  });
+  return s;
+}
+
+function markdown(src, vid){
+  const out = [];
+  const lines = src.replace(/\r/g,'').split('\n');
+  let list = null, para = [], fence = null;
+
+  const flushPara = () => { if (para.length){ out.push('<p>'+inline(para.join(' '),vid)+'</p>'); para = []; } };
+  const closeList = () => { if (list){ out.push('</'+list+'>'); list = null; } };
+
+  for (const raw of lines){
+    const line = raw.trimEnd();
+    if (fence !== null){
+      if (/^```/.test(line.trim())){ out.push('<pre><code>'+esc(fence.join('\n'))+'</code></pre>'); fence = null; }
+      else fence.push(raw);
+      continue;
+    }
+    if (/^```/.test(line.trim())){ flushPara(); closeList(); fence = []; continue; }
+    if (!line.trim()){ flushPara(); closeList(); continue; }
+
+    let m;
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))){
+      flushPara(); closeList();
+      const lvl = Math.min(m[1].length + 1, 6);
+      out.push('<h'+lvl+'>'+inline(m[2],vid)+'</h'+lvl+'>'); continue;
+    }
+    if (/^([-*_])\s*\1\s*\1[-*_\s]*$/.test(line)){ flushPara(); closeList(); out.push('<hr>'); continue; }
+    if ((m = line.match(/^>\s?(.*)$/))){
+      flushPara(); closeList(); out.push('<blockquote>'+inline(m[1],vid)+'</blockquote>'); continue;
+    }
+    if ((m = line.match(/^\s*[-*+]\s+(.*)$/))){
+      flushPara();
+      if (list !== 'ul'){ closeList(); out.push('<ul>'); list = 'ul'; }
+      out.push('<li>'+inline(m[1],vid)+'</li>'); continue;
+    }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))){
+      flushPara();
+      if (list !== 'ol'){ closeList(); out.push('<ol>'); list = 'ol'; }
+      out.push('<li>'+inline(m[1],vid)+'</li>'); continue;
+    }
+    closeList();
+    para.push(line.trim());
+  }
+  if (fence !== null) out.push('<pre><code>'+esc(fence.join('\n'))+'</code></pre>');
+  flushPara(); closeList();
+  return out.join('\n');
+}
+
+/* ---------- ui helpers ---------- */
+function note(html, isErr){
+  $('#msg').innerHTML = html ? '<div class="msg'+(isErr?' err':'')+'">'+html+'</div>' : '';
+}
+function flash(btn, text){
+  const old = btn.textContent;
+  btn.textContent = text; btn.disabled = true;
+  setTimeout(()=>{ btn.textContent = old; btn.disabled = false; }, 1100);
+}
+async function copy(text, btn){
+  try{
+    await navigator.clipboard.writeText(text);
+    flash(btn, 'Copied ✓');
+  }catch{
+    const ta = el('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); flash(btn,'Copied ✓'); }
+    catch{ flash(btn,'Copy failed'); }
+    ta.remove();
+  }
+}
+const fmt = s => { s=Math.floor(s); const h=(s/3600)|0, m=((s%3600)/60)|0, x=s%60;
+  return h ? h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0')
+           : String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'); };
+
+/* ---------- render ---------- */
+function render(d){
+  DATA = d; SUMMARY = "";
+  $('#sumOut').innerHTML = ''; $('#copySum').disabled = true;
+  $('#result').classList.add('on');
+
+  const t = $('#thumb');
+  t.src = 'https://i.ytimg.com/vi/'+d.video_id+'/mqdefault.jpg';
+  t.hidden = false; t.onerror = () => { t.hidden = true; };
+
+  const mins = Math.round(d.duration/60);
+  const facts = [
+    ['<a href="https://www.youtube.com/watch?v='+d.video_id+'" target="_blank" rel="noopener" style="color:inherit">'+d.video_id+' ↗</a>', ''],
+    [d.language + (d.generated ? ' · auto' : ' · manual'), d.generated ? '' : 'good'],
+    [mins + ' min', ''],
+    [d.word_count.toLocaleString() + ' words', ''],
+    [d.segments.length.toLocaleString() + ' lines', ''],
+  ];
+  if (d.cached) facts.push(['cached', 'good']);
+  $('#facts').innerHTML = facts.map(([txt,cls]) => '<span class="pill '+cls+'">'+txt+'</span>').join('');
+
+  // language switcher
+  const sel = $('#lang');
+  if (d.languages && d.languages.length > 1){
+    sel.innerHTML = d.languages.map(l =>
+      '<option value="'+l.code+'"'+(l.code===d.language_code?' selected':'')+'>'+
+      esc(l.name)+(l.generated?' (auto)':'')+'</option>').join('');
+    sel.hidden = false;
+  } else sel.hidden = true;
+
+  // cues
+  const box = $('#cues');
+  box.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const s of d.segments){
+    const row = el('div','cue');
+    const a = el('a');
+    a.textContent = fmt(s.start);
+    a.href = 'https://www.youtube.com/watch?v='+d.video_id+'&t='+Math.floor(s.start)+'s';
+    a.target = '_blank'; a.rel = 'noopener';
+    const span = el('span');
+    span.textContent = s.text.replace(/\s+/g,' ').trim();
+    row.append(a, span);
+    frag.appendChild(row);
+  }
+  box.appendChild(frag);
+  $('#find').value = '';
+  box.scrollTop = 0;
+}
+
+/* ---------- filter ---------- */
+$('#find').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const rows = $('#cues').children;
+  let shown = 0;
+  for (const row of rows){
+    const span = row.lastElementChild;
+    const text = span.textContent;
+    if (!q){ row.classList.remove('hide'); span.textContent = text; shown++; continue; }
+    const i = text.toLowerCase().indexOf(q);
+    if (i < 0){ row.classList.add('hide'); continue; }
+    row.classList.remove('hide'); shown++;
+    span.innerHTML = esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length));
+  }
+  const old = $('#cues .empty'); if (old) old.remove();
+  if (!shown){ const e2 = el('div','empty'); e2.textContent = 'No lines match “'+q+'”'; $('#cues').appendChild(e2); }
+});
+
+/* ---------- fetching ---------- */
+async function load(language){
+  const url = $('#url').value.trim();
+  if (!url) return;
+  $('#go').disabled = true;
+  note('<span class="spinner"></span> &nbsp;Fetching transcript…');
+  try{
+    const r = await fetch('/api/transcript', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ url, language: language || null })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error){
+      note('<strong>'+esc(d.error || 'Request failed')+'</strong>'+(d.hint?'<div class="hint">'+esc(d.hint)+'</div>':''), true);
+      return;
+    }
+    note('');
+    render(d);
+  }catch(err){
+    note('<strong>Could not reach the local server.</strong><div class="hint">Is it still running in your terminal?</div>', true);
+  }finally{ $('#go').disabled = false; }
+}
+
+$('#f').addEventListener('submit', e => { e.preventDefault(); load(null); });
+$('#lang').addEventListener('change', e => load(e.target.value));
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === tab));
+  document.querySelectorAll('.pane').forEach(p =>
+    p.classList.toggle('on', p.id === 'pane-' + tab.dataset.pane));
+}));
+
+/* ---------- copy / download ---------- */
+$('#copyTs').onclick    = e => DATA && copy(DATA.text_timestamped, e.target);
+$('#copyPlain').onclick = e => DATA && copy(DATA.text_plain, e.target);
+$('#copySum').onclick   = e => SUMMARY && copy(SUMMARY, e.target);
+$('#dl').onclick = () => {
+  if (!DATA) return;
+  const blob = new Blob([DATA.text_timestamped], {type:'text/plain;charset=utf-8'});
+  const a = el('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = DATA.video_id + '.txt';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+};
+
+/* ---------- summarize ---------- */
+$('#sum').onclick = async () => {
+  if (!DATA) return;
+  const btn = $('#sum'), out = $('#sumOut');
+  btn.disabled = true;
+  out.innerHTML = '<div class="msg"><span class="spinner"></span> &nbsp;Reading the transcript… this takes 15–60s.</div>';
+  try{
+    const r = await fetch('/api/summarize', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: DATA.text_timestamped, style: $('#style').value, video_id: DATA.video_id })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error){
+      out.innerHTML = '<div class="msg err"><strong>'+esc(d.error||'Failed')+'</strong>'+
+                      (d.hint?'<div class="hint">'+esc(d.hint)+'</div>':'')+'</div>';
+      return;
+    }
+    SUMMARY = d.summary;
+    out.innerHTML = '<div class="md">'+markdown(d.summary, DATA.video_id)+'</div>';
+    if (d.truncated) out.insertAdjacentHTML('afterbegin',
+      '<div class="msg" style="margin:0 0 12px"><strong>Long video.</strong>'+
+      '<div class="hint">Only the first part of the transcript was summarised.</div></div>');
+    $('#copySum').disabled = false;
+  }catch{
+    out.innerHTML = '<div class="msg err"><strong>Could not reach the local server.</strong></div>';
+  }finally{ btn.disabled = false; }
+};
+
+/* ---------- keyboard ---------- */
+addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); load(null); }
+  if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)){
+    e.preventDefault(); $('#find').focus();
+  }
+});
+$('#url').focus();
+</script>
+</body>
+</html>

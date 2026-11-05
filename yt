@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Launch the YouTube transcript tool.
+#   yt          -> start server, open browser
+#   yt --no-open-> start server only
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PORT="${YT_PORT:-8420}"
+PY="$HERE/.venv/bin/python"
+
+if [[ ! -x "$PY" ]]; then
+  echo "Setting up for the first time..."
+  command -v uv >/dev/null || { echo "Need 'uv' (brew install uv)"; exit 1; }
+  uv venv --python 3.12 "$HERE/.venv" >/dev/null
+  uv pip install --python "$PY" -q -r "$HERE/requirements.txt"
+fi
+
+# Already running? Just open it.
+if curl -sf --max-time 1 "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
+  echo "Already running on http://localhost:$PORT"
+  [[ "${1:-}" == "--no-open" ]] || open "http://localhost:$PORT"
+  exit 0
+fi
+
+echo "YouTube Transcript  ->  http://localhost:$PORT      (ctrl-c to stop)"
+if [[ "${1:-}" != "--no-open" ]]; then
+  ( sleep 1.2; open "http://localhost:$PORT" ) &
+fi
+
+cd "$HERE"
+exec "$PY" -m uvicorn app:app --host 127.0.0.1 --port "$PORT" --log-level warning

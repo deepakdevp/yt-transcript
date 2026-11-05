@@ -1,0 +1,4 @@
+youtube-transcript-api>=1.2.4
+fastapi>=0.141
+uvicorn[standard]>=0.34
+pytest>=8.0
